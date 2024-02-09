@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <title>Document</title>
+</head>
+
+<body>
+  <div class="wrapper">
+
+    <div class="header">
+      <div class="text"><img src="logo.svg" alt="logo"></div>
+      <div class="fon"></div>
+      <div class="logo"></div>
+    </div>
+    <div class="container">
+
+      <div class="main">
+
+        <form id="myForm" method="POST" action="form">
+          <input type="text" id="inputField" name="input_field" autocomplete="on" placeholder="Input text to check">
+          <button type="submit">Check</button>
+          <div id="value" class="value"></div>
+          <div id="result" class="result"></div>
+          <div id="hint"></div>
+        </form>
+
+        
+
+      </div>
+
+    </div>
+
+    <div class="footer"></div>
+
+  </div>
+  <script>
+    const form = document.getElementById('myForm');
+    const inputField = document.getElementById('inputField');
+    const resultDiv = document.getElementById('result');
+    const valueDiv = document.getElementById('value')
+    const hintDiv = document.getElementById('hint')
+
+    function getFolder(inputValue) {
+      // Define color mappings based on substrings of input values
+      const folderMap = {
+        ' 2024': '2024',
+        ' 2025': '2025',
+        ' 2026': '2026',
+        ' 2027': '2027',
+        // Add more mappings as needed
+      };
+
+      // Check if any substring of inputValue matches a color mapping
+      for (const key in folderMap) {
+        if (inputValue.includes(key)) {
+          return folderMap[key];
+        }
+      }
+
+      // Return default class if no matching substring found
+      return 'default';
+    }
+
+    
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const inputValue = inputField.value.trim();
+
+      const folder = getFolder(inputValue)
+
+      // Fetch content of used-data.txt
+      const usedDataResponse = await fetch(`https://api.github.com/repos/sako0429/data/contents/${folder}/used-data.txt`, {
+        headers: {
+          'Authorization': 'token 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'
+        }
+      });
+
+      if (!usedDataResponse.ok) {
+        resultDiv.textContent = 'Error fetching used data from GitHub.';
+        return;
+      }
+
+      const usedData = await usedDataResponse.json();
+      const usedDataContent = atob(usedData.content); // Decode Base64 content
+      const usedDataContentArray = usedDataContent.split('\n').filter(line => line.trim() !== ''); // Parse content into an array and remove empty lines
+
+      // Check if inputValue exists in used-data.txt
+      if (usedDataContentArray.includes(inputValue)) {
+        valueDiv.textContent = `${inputValue}`;
+        resultDiv.textContent = `Value is used.`;
+        resultDiv.className = 'result used';
+        hintDiv.className = 'checked';
+        return;
+      }
+
+      // Fetch content of data.txt
+      const dataResponse = await fetch(`https://api.github.com/repos/sako0429/data/contents/${folder}/data.txt`, {
+        headers: {
+          'Authorization': 'token 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'
+        }
+      });
+
+      if (!dataResponse.ok) {
+        resultDiv.textContent = 'Error fetching data from GitHub.';
+        return;
+      }
+
+      const data = await dataResponse.json();
+      const dataContent = atob(data.content); // Decode Base64 content
+
+      // Check if inputValue exists in data.txt
+      if (dataContent.includes(inputValue)) {
+        // Add inputValue to used-data.txt
+        usedDataContentArray.push(inputValue);
+
+        // Encode usedDataContentArray to Base64
+        const usedDataContentBase64 = btoa(usedDataContentArray.join('\n'));
+
+        // Write updated content to used-data.txt
+        const updateUsedDataResponse = await fetch(`https://api.github.com/repos/sako0429/data/contents/${folder}/used-data.txt`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'token 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',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'Update used-data.txt via API',
+            content: usedDataContentBase64,
+            sha: usedData.sha
+          })
+        });
+
+        if (!updateUsedDataResponse.ok) {
+          resultDiv.textContent = 'Error updating used data on GitHub.';
+          return;
+        }
+
+        // Remove inputValue from data.txt and remove empty lines
+        const newDataContent = dataContent.split('\n')
+          .filter(line => line.trim() !== inputValue)
+          .join('\n')
+          .trim(); // Trim whitespace
+        const newDataContentBase64 = btoa(newDataContent);
+
+        // Write updated content to data.txt
+        const updateDataResponse = await fetch(`https://api.github.com/repos/sako0429/data/contents/${folder}/data.txt`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'token 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',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'Update data.txt via API',
+            content: newDataContentBase64,
+            sha: data.sha
+          })
+        });
+
+
+        if (!updateDataResponse.ok) {
+          resultDiv.textContent = 'Error updating data on GitHub.';
+          return;
+        }
+        valueDiv.textContent = `${inputValue}`;
+        resultDiv.textContent = `Value moved successfully.`;
+        resultDiv.className = 'result moved';
+        hintDiv.className = 'new';
+      } else {
+        valueDiv.textContent = `${inputValue}`;
+        resultDiv.textContent = `Value not found in data.txt.`;
+        resultDiv.className = 'result not-found';
+        hintDiv.className = 'notfind';
+      }
+
+    });
+
+
+  </script>
+</body>
+
+</html>
